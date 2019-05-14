@@ -153,18 +153,18 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
 //            ActivityCompat.requestPermissions(ScavengerHuntBeginActivity.this, permissions, REQUEST_CAMERA_PERMISSION);
 //        }
 //        if (cameraPermissionAccepted) {
-            Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            if (cameraIntent.resolveActivity(getPackageManager()) != null) {
-                //if (currentImageFile != null && currentImageFile.exists()) currentImageFile.delete();
-                currentImageFile = new File(Environment.getExternalStorageDirectory(), "currentImage.bmp");
-                image = Uri.fromFile(currentImageFile);
-                imageFilename = currentImageFile.toString();
-                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, image);
-                startActivityForResult(cameraIntent, TAKE_PHOTO_CODE);
+        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (cameraIntent.resolveActivity(getPackageManager()) != null) {
+            //if (currentImageFile != null && currentImageFile.exists()) currentImageFile.delete();
+            currentImageFile = new File(Environment.getExternalStorageDirectory(), "currentImage.bmp");
+            image = Uri.fromFile(currentImageFile);
+            imageFilename = currentImageFile.toString();
+            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, image);
+            startActivityForResult(cameraIntent, TAKE_PHOTO_CODE);
 //            }
-            } else {
-                postToastMessage("Can't take photo without permission!");
-            }
+        } else {
+            postToastMessage("Can't take photo without permission!");
+        }
     }
 
     //If the photo is captured then set the image view to the photo captured.
@@ -188,7 +188,6 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
 
             }
 
@@ -247,7 +246,7 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
     }
 
     private void updateHunt(String responseJson) throws JSONException {
-        int successCount = 0;
+
         boolean itemFound = false;
         //List<String> returnedTags = new ArrayList<String>();
         JSONObject responseJsonObj = new JSONObject(responseJson);
@@ -260,47 +259,23 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
                 final SearchWordCardModel card = adapter.getItem(j);
                 System.out.println("card word: " + card.getSearchWord());
                 if (card.isFound()) {
-                    successCount++;
                     continue;
                 } else if (name.toLowerCase().contains(card.getSearchWord().toLowerCase())) {
                     System.out.println("match on " + name);
-                    successCount++;
                     itemFound = true;
 
-                    final int finalCount = successCount;
                     Collections.shuffle(praisePhrasesList);
-                    postToastMessage("You matched " + name + "!!! \nNICE!!!");
-                    tts.speak("You matched " + name + "! Nice!", TextToSpeech.QUEUE_ADD, null, null);
+                    postToastMessage("You matched " + card.getSearchWord() + "!!! \nNICE!!!");
+                    tts.speak("You matched " + card.getSearchWord() + "! Nice!", TextToSpeech.QUEUE_ADD, null, null);
                     tts.speak(praisePhrasesList.get(0), TextToSpeech.QUEUE_ADD, null, null);
-
-                    if (successCount == NUMBER_OF_HUNT_WORDS) {
-                        postToastMessage("YOU FOUND ALL THE WORDS!!!  REALLY ACCEPTABLE JOB!!!");
-                        tts.speak("You found all the words! Really acceptable job!", TextToSpeech.QUEUE_ADD, null, null);
-                        tts.speak("You rock!", TextToSpeech.QUEUE_ADD, null, null);
-                    }
+                    card.setFound(true);
 
                     scavAct.runOnUiThread(new Runnable() {
                         public void run() {
                             card.setFound(true);
                             adapter.notifyDataSetChanged();
-                            if (finalCount == NUMBER_OF_HUNT_WORDS) {
-                                userImage.setImageResource(R.drawable.great_job_you_rock);
-                                setNewSearchWords();
-                            }
                         }
                     });
-                    /*new Handler(Looper.getMainLooper()).post(new Runnable(){
-                        @Override
-                        public void run() {
-                            card.setSearchWord(name + " => FOUND!");
-                        }
-                    });*/
-                    //adapter.remove(card);
-                    //adapter.add(new SearchWordCardModel(name + " FOUND!  BADASS!!!"));
-                    //adapter.notifyDataSetChanged();
-                    //cardListView.getChildAt(j).setBackgroundColor(Color.GREEN);
-                    //adapter..getView(j).setBackgroundColor(Color.GREEN);
-                    //break;
                 }
             }
 
@@ -308,16 +283,40 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
         if (!itemFound) {
             postToastMessage("No match this time; try again!");
             tts.speak("No match this time; try again!", TextToSpeech.QUEUE_ADD, null, null);
+        } else {
+            int successCount = 0;
+            for (int j = 0; j < adapter.getCount(); j++) {
+                final SearchWordCardModel card = adapter.getItem(j);
+                if (card.isFound()) successCount++;
+            }
+            if (successCount == NUMBER_OF_HUNT_WORDS) {
+                final int finalCount = successCount;
+                postToastMessage("YOU FOUND ALL THE WORDS!!!  REALLY ACCEPTABLE JOB!!!");
+                tts.speak("You found all the words! Really acceptable job!", TextToSpeech.QUEUE_ADD, null, null);
+                tts.speak("You rock!", TextToSpeech.QUEUE_ADD, null, null);
+
+                scavAct.runOnUiThread(new Runnable() {
+                    public void run() {
+                        cardListView.removeAllViewsInLayout();
+                        userImage.setImageResource(R.drawable.great_job_you_rock);
+                        setNewSearchWords();
+                    }
+                });
+            }
         }
     }
 
     private void setNewSearchWords() {
+
         for (int j = 0; j < adapter.getCount(); j++) {
             SearchWordCardModel card = adapter.getItem(j);
+
             System.out.println("Trying to remove: " + card.getSearchWord() + " from " + mainWordsList.toString());
             mainWordsList.remove(mainWordsList.indexOf(card.getSearchWord()));
         }
         adapter.clear();
+        adapter = new SearchWordCardAdapter(this);
+        cardListView.setAdapter(adapter);
         int currentHuntWordsSize = mainWordsList.size() < NUMBER_OF_HUNT_WORDS ? mainWordsList.size() : NUMBER_OF_HUNT_WORDS;
 
         if (currentHuntWordsSize == 0) {
@@ -329,9 +328,11 @@ public class ScavengerHuntBeginActivity extends AppCompatActivity {
             for (int i = 0; i < currentHuntWordsSize; i++) {
                 adapter.add(new SearchWordCardModel(mainWordsList.get(i)));
             }
+            adapter.notifyDataSetChanged();
             postToastMessage("Find these new words!");
             tts.speak("Please find these items and take a picture!", TextToSpeech.QUEUE_ADD, null, null);
         }
+
     }
 
     public void postToastMessage(final String message) {
